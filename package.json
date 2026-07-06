@@ -1,0 +1,31 @@
+{
+  "name": "eu-tools-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paid MCP tools for AI agents — EU VAT validation (VIES) and official ECB EUR FX rates, paid per call in USDC via x402",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "tsx src/vies.test.ts && tsx src/ecb.test.ts",
+    "smoke": "tsx src/smoke.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "x402-mica": "^0.2.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.5",
+    "@x402/evm": "^2.17.0",
+    "@x402/mcp": "^2.17.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "viem": "^2.54.1"
+  }
+}
