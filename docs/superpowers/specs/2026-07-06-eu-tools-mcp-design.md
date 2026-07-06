@@ -23,7 +23,7 @@ Streamable HTTP MCP server (stateless mode, same recipe as x402-mica's
 | Tool | Price | Upstream | What it returns |
 |------|-------|----------|-----------------|
 | `validate_vat(country, vat_number)` | $0.005 USDC | EU Commission VIES REST API | whether the VAT number is valid + registered company name/address |
-| `eur_fx(currency, date?)` | $0.001 USDC | ECB official reference rates | the official EUR exchange rate (latest, or for a given historical date) |
+| `eur_fx(currency, date?)` | $0.001 USDC | ECB official reference rates | the official EUR exchange rate (latest, or a business day within the last ~90 days — older ECB history ships only as ZIP, which stdlib can't unpack; YAGNI) |
 
 Both tools are things an LLM cannot do reliably on its own (live,
 authoritative data) and both fit the EU/MiCA story of the package.
