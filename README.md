@@ -47,7 +47,7 @@ Tool listing (`tools/list`) is free — only calls are paid.
 Every paid call lands in a public, read-only MiCA audit trail (timestamp,
 asset, amount, payer, on-chain tx, `mica_compliant` flag):
 
-**https://eu-tools-mcp.fly.dev/audit?key=PUBLIC_DEMO_KEY**
+**https://eu-tools-mcp.fly.dev/audit?key=demo-c43d89b159ec2227**
 
 CSV/JSON export: append `&format=csv` or `&format=json`.
 
