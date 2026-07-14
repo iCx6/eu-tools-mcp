@@ -11,14 +11,14 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "tsx src/vies.test.ts && tsx src/ecb.test.ts",
+    "test": "tsx src/vies.test.ts && tsx src/ecb.test.ts && tsx src/eur-fx.test.ts",
     "smoke": "tsx src/smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "x402-mica": "^0.2.2",
+    "x402-mica": "^0.2.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {

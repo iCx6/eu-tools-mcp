@@ -5,9 +5,10 @@ import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { withPayment, auditDashboard } from "x402-mica";
+import { withPayment, auditDashboard, x402Middleware } from "x402-mica";
 import { parseVatInput, checkVat } from "./vies.js";
 import { getRate } from "./ecb.js";
+import { eurFxValidate, eurFxHandler } from "./eur-fx.js";
 
 const payTo = process.env.PAY_TO;
 if (!payTo) throw new Error("Missing PAY_TO in environment");
@@ -101,6 +102,21 @@ app.post("/mcp", async (req, res) => {
 app.get("/mcp", (_req, res) => { res.status(405).send("stateless server: POST only"); });
 app.delete("/mcp", (_req, res) => { res.status(405).send("stateless server: POST only"); });
 
+// Plain-HTTP twin of the eur_fx MCP tool: a bare GET gets a real HTTP 402
+// challenge (probe-friendly), a paid GET gets the same ECB data at the same
+// price, logged to the same audit db. Note: unlike withPayment, x402Middleware
+// wires its facilitator eagerly — on mainnet the CDP keys must be set at startup.
+app.use("/eur-fx", eurFxValidate); // 400 on malformed input BEFORE any 402/charge
+app.use(
+  x402Middleware({
+    ...paid,
+    route: "GET /eur-fx",
+    price: "$0.001",
+    description: "Official ECB euro reference exchange rate",
+  }),
+);
+app.get("/eur-fx", eurFxHandler);
+
 app.get("/audit", auditDashboard({ dbPath, apiKey: process.env.AUDIT_API_KEY }));
 
 app.get("/", (_req, res) => {
@@ -109,6 +125,7 @@ app.get("/", (_req, res) => {
       "POST /mcp   MCP Streamable HTTP endpoint\n" +
       "  validate_vat  $0.005  EU VAT number check (official VIES registry)\n" +
       "  eur_fx        $0.001  official ECB euro reference rates\n" +
+      "GET /eur-fx  $0.001  same ECB rates over plain HTTP (x402: the 402 challenge tells you how to pay)\n" +
       "GET /audit  live MiCA-compliance audit trail (read-only)\n\n" +
       "Docs: https://github.com/iCx6/eu-tools-mcp — built with x402-mica (npmjs.com/package/x402-mica)",
   );
