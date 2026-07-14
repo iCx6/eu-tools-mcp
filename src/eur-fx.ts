@@ -1,20 +1,23 @@
 import type { RequestHandler } from "express";
-import { getRate } from "./ecb.js";
+import { getRate, fxCurrencyError, fxDateError } from "./ecb.js";
 
 /**
- * Runs BEFORE the paywall in the Express chain: a malformed request is rejected
- * 400 unpaid — never charge for a request that was never fulfillable. Only shape
- * is checked here; semantic failures (currency not on the ECB list, no rate for
- * the date) surface post-payment as 502 from the handler.
+ * Runs BEFORE the paywall in the Express chain: every caller error decidable for
+ * free (shape, unknown currency, future/out-of-window date) is rejected 400
+ * unpaid — never charge for a request that was never fulfillable. What remains
+ * post-payment is only genuinely unforeseeable: an ECB-side failure (502).
  */
 export const eurFxValidate: RequestHandler = (req, res, next) => {
   const { currency, date } = req.query;
-  if (currency && !(typeof currency === "string" && /^[A-Za-z]{3}$/.test(currency.trim()))) {
-    res.status(400).json({ error: "invalid currency — use a single 3-letter ISO 4217 code, e.g. USD" });
-    return;
-  }
-  if (date && !(typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date))) {
-    res.status(400).json({ error: "invalid date — use YYYY-MM-DD" });
+  const err =
+    (currency
+      ? typeof currency === "string" ? fxCurrencyError(currency) : "currency must be a single value"
+      : null) ??
+    (date
+      ? typeof date === "string" ? fxDateError(date) : "date must be a single value"
+      : null);
+  if (err) {
+    res.status(400).json({ error: err });
     return;
   }
   next();
@@ -34,8 +37,9 @@ export const eurFxHandler: RequestHandler = async (req, res) => {
       ),
     );
   } catch (err) {
-    // Paid but unservable (bad input or ECB down) — non-custodial x402 has no
-    // refunds; mirror the MCP tool's structured-error behaviour.
+    // Paid but unservable — with input rejected pre-paywall this is a genuine
+    // ECB-side failure; non-custodial x402 has no refunds, mirror the MCP
+    // tool's structured-error behaviour.
     res.status(502).json({ error: err instanceof Error ? err.message : String(err) });
   }
 };

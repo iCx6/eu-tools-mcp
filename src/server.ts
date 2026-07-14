@@ -7,7 +7,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { withPayment, auditDashboard, x402Middleware } from "x402-mica";
 import { parseVatInput, checkVat } from "./vies.js";
-import { getRate } from "./ecb.js";
+import { getRate, fxCurrencyError, fxDateError } from "./ecb.js";
 import { eurFxValidate, eurFxHandler } from "./eur-fx.js";
 
 const payTo = process.env.PAY_TO;
@@ -68,11 +68,26 @@ function buildServer(): McpServer {
   server.tool(
     "eur_fx",
     "Official ECB euro reference rate: 1 EUR = rate × currency. Latest business day by default, " +
-      "or a specific date (YYYY-MM-DD, business days within the last 90 days). Costs $0.001 USDC " +
-      "per call via x402 (Base).",
+      "or a specific date (YYYY-MM-DD within the last 90 days). Weekends/holidays return the most " +
+      "recent preceding business day's rate — the response carries both requested_date and " +
+      "rate_date, so a carried-forward rate is always explicit. Costs $0.001 USDC per call via " +
+      "x402 (Base).",
     {
-      currency: z.string().describe("3-letter ISO currency code, e.g. USD, HUF, GBP"),
-      date: z.string().optional().describe("YYYY-MM-DD within the last 90 days; omit for latest"),
+      // superRefine runs in the SDK's schema validation, BEFORE the payment
+      // wrapper — invalid input is rejected unpaid, same as the HTTP route.
+      currency: z.string()
+        .superRefine((v, ctx) => {
+          const e = fxCurrencyError(v);
+          if (e) ctx.addIssue({ code: z.ZodIssueCode.custom, message: e });
+        })
+        .describe("3-letter ISO currency code on the ECB reference list, e.g. USD, HUF, GBP"),
+      date: z.string()
+        .superRefine((v, ctx) => {
+          const e = fxDateError(v);
+          if (e) ctx.addIssue({ code: z.ZodIssueCode.custom, message: e });
+        })
+        .optional()
+        .describe("YYYY-MM-DD within the last 90 days; omit for latest. Non-business days return the preceding business day's rate (see rate_date)"),
     },
     eurFx,
   );
@@ -112,7 +127,8 @@ app.use(
     ...paid,
     route: "GET /eur-fx",
     price: "$0.001",
-    description: "Official ECB euro reference exchange rate",
+    description:
+      "Official ECB euro reference exchange rate (non-business days return the preceding business day's rate, labelled via rate_date)",
   }),
 );
 app.get("/eur-fx", eurFxHandler);
@@ -125,7 +141,8 @@ app.get("/", (_req, res) => {
       "POST /mcp   MCP Streamable HTTP endpoint\n" +
       "  validate_vat  $0.005  EU VAT number check (official VIES registry)\n" +
       "  eur_fx        $0.001  official ECB euro reference rates\n" +
-      "GET /eur-fx  $0.001  same ECB rates over plain HTTP (x402: the 402 challenge tells you how to pay)\n" +
+      "GET /eur-fx  $0.001  same ECB rates over plain HTTP (x402: the 402 challenge tells you how to pay);\n" +
+      "             weekends/holidays return the preceding business day's rate — compare rate_date to requested_date\n" +
       "GET /audit  live MiCA-compliance audit trail (read-only)\n\n" +
       "Docs: https://github.com/iCx6/eu-tools-mcp — built with x402-mica (npmjs.com/package/x402-mica)",
   );

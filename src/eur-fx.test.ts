@@ -47,6 +47,24 @@ const runHandler = async (q: Record<string, unknown>) => {
   assert.match((out.body as { error: string }).error, /date/);
 }
 
+// validator: shape-valid but unknown currency (not on the ECB list) -> 400
+// pre-payment, naming the value and listing supported codes
+{
+  const out = runValidate({ currency: "ZZZ" });
+  assert.equal(out.status, 400);
+  assert.equal(out.nextCalled, false);
+  assert.match((out.body as { error: string }).error, /ZZZ/);
+  assert.match((out.body as { error: string }).error, /USD/);
+}
+
+// validator: future date -> 400 pre-payment (no rate can ever exist yet)
+{
+  const out = runValidate({ currency: "USD", date: "2999-01-01" });
+  assert.equal(out.status, 400);
+  assert.equal(out.nextCalled, false);
+  assert.match((out.body as { error: string }).error, /future/);
+}
+
 // validator: well-formed request passes through untouched to the paywall
 {
   const out = runValidate({ currency: "usd", date: "2026-07-14" });
@@ -67,6 +85,25 @@ const runHandler = async (q: Record<string, unknown>) => {
   assert.equal(out.status, 200);
   assert.equal((out.body as { currency: string }).currency, "EUR");
   assert.equal((out.body as { rate: number }).rate, 1);
+}
+
+// handler: weekend date -> 200 with the preceding business day's rate, and the
+// carry-forward is explicit (rate_date != requested_date), never silent
+{
+  const FIXTURE = `<Cube><Cube time='2026-07-06'><Cube currency='USD' rate='1.1415'/></Cube>
+    <Cube time='2026-07-03'><Cube currency='USD' rate='1.1398'/></Cube></Cube>`;
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = (async () => ({ ok: true, text: async () => FIXTURE })) as never;
+  try {
+    const out = await runHandler({ currency: "USD", date: "2026-07-05" }); // Sunday
+    assert.equal(out.status, 200);
+    const body = out.body as { requested_date: string; rate_date: string; rate: number };
+    assert.equal(body.requested_date, "2026-07-05");
+    assert.equal(body.rate_date, "2026-07-03");
+    assert.equal(body.rate, 1.1398);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
 }
 
 // handler: genuine ECB-side failure on a VALID request -> 502 (post-payment; the
