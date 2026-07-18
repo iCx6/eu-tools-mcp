@@ -21,6 +21,17 @@ assert.equal(table.get("2026-07-06")?.get("HUF"), 353.5);
 assert.equal(table.get("2026-07-03")?.get("USD"), 1.1398);
 assert.equal(table.get("2026-07-03")?.get("HUF"), undefined);
 
+// The hist-90d file uses DOUBLE-quoted attributes while the daily file is
+// single-quoted — hit in production: every dated query 502'd because the parser
+// matched nothing in the 90-day file. Both quote styles must parse identically.
+{
+  const tableDq = parseEcbXml(FIXTURE.replaceAll("'", '"'));
+  assert.equal(tableDq.size, 2);
+  assert.equal(tableDq.get("2026-07-06")?.get("USD"), 1.1415);
+  assert.equal(tableDq.get("2026-07-06")?.get("HUF"), 353.5);
+  assert.equal(tableDq.get("2026-07-03")?.get("USD"), 1.1398);
+}
+
 // EUR needs no fetch and is always 1; no carry-forward applies
 const eur = await getRate("eur", "2026-07-05");
 assert.equal(eur.rate, 1);

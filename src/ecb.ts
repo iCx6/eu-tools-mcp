@@ -5,14 +5,16 @@ const HIST90_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d
 export type RateTable = Map<string, Map<string, number>>;
 
 /**
- * The eurofxref format is rigidly machine-generated (single-quoted attributes,
- * self-closing currency cubes), so two regexes beat an XML dependency.
+ * The eurofxref format is rigidly machine-generated (self-closing currency
+ * cubes), so two regexes beat an XML dependency. Quote style differs per file:
+ * the daily file single-quotes attributes, the hist-90d file DOUBLE-quotes them
+ * — accept both (learned in production: dated queries 502'd on the 90d file).
  */
 export function parseEcbXml(xml: string): RateTable {
   const table: RateTable = new Map();
-  for (const day of xml.matchAll(/<Cube time='(\d{4}-\d{2}-\d{2})'>([\s\S]*?)<\/Cube>/g)) {
+  for (const day of xml.matchAll(/<Cube time=['"](\d{4}-\d{2}-\d{2})['"]>([\s\S]*?)<\/Cube>/g)) {
     const rates = new Map<string, number>();
-    for (const m of day[2].matchAll(/<Cube currency='([A-Z]{3})' rate='([\d.]+)'\/>/g)) {
+    for (const m of day[2].matchAll(/<Cube currency=['"]([A-Z]{3})['"] rate=['"]([\d.]+)['"]\/>/g)) {
       rates.set(m[1], Number(m[2]));
     }
     table.set(day[1], rates);
