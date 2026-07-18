@@ -57,8 +57,8 @@ function buildServer(): McpServer {
     "validate_vat",
     "Check an EU VAT number against the official EU VIES registry; returns validity plus the " +
       "registered company name/address where the member state discloses them. Costs $0.005 USDC " +
-      "per call via x402 (Base). Note: payment settles before the lookup, so if the member " +
-      "state's VIES service is down you receive a structured error for that call, not a refund.",
+      "per call via x402 (Base). Note: a failed lookup still settles — if the member state's " +
+      "VIES service is down you receive a structured error for that (paid) call, not a refund.",
     {
       country: z.string().describe("Two-letter EU VAT country code (EL = Greece, XI = Northern Ireland)"),
       vat_number: z.string().describe("VAT number, with or without the country prefix"),
